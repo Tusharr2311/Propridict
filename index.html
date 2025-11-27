@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Propridict – Premium Land Price Predictor</title>
+
+  <!-- Favicon (inline SVG data URI) -->
+  <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="%234361ee"/><text x="50%25" y="54%25" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="36" fill="%23ffffff">P</text></svg>'>
+
+  <!-- External Libraries -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer"/>
+
+  <style>
+    :root {
+      --primary:#4361ee; --secondary:#3f37c9; --bg:linear-gradient(135deg,#f0f9ff 0%,#e6f7ff 100%);
+      --card:#ffffff; --shadow:0 10px 30px rgba(0,0,0,.08); --radius:16px; --text:#1a1a1a; --muted:#666;
+      --border:#e0e0e0; --input:#d1d5db; --error:#e74c3c; --pill:#f3f4f6;
+      --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+                   "Helvetica Neue", "Segoe UI", Roboto, Arial, system-ui, sans-serif;
+    }
+    [data-theme="dark"] {
+      --primary:#7aa2ff; --secondary:#9aa8ff; --bg:radial-gradient(1200px 400px at 10% 10%,#0b1220,#0f172a);
+      --card:#0b1220; --text:#e5e7eb; --muted:#9aa0a6; --border:#1f2937; --pill:#111827;
+    }
+
+    * { box-sizing:border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin:0; color:var(--text); background:var(--bg);
+      font-family: var(--font-sans); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; letter-spacing:-0.01em;
+    }
+
+    /* Brand bar */
+    .brand-bar { position: sticky; top:0; z-index:1000; background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom:1px solid var(--border);
+    }
+    [data-theme="dark"] .brand-bar { background: rgba(17,24,39,0.7); }
+    .brand-wrap { max-width:1100px; margin:0 auto; padding:10px 18px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .brand { display:inline-flex; align-items:center; gap:10px; text-decoration:none; }
+    .brand-name { font-weight:800; color:var(--text); font-size:1.05rem; letter-spacing:.0em; }
+    .nav-links { display:inline-flex; gap:6px; flex-wrap:wrap; align-items:center; }
+    .nav-links a { color:var(--text); text-decoration:none; padding:8px 10px; border-radius:10px; font-weight:700; letter-spacing:-0.01em; }
+    .nav-links a:hover { background:#eef2ff; color:var(--primary); }
+    [data-theme="dark"] .nav-links a:hover { background:#1f2937; }
+
+    .theme-toggle { display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border-radius:10px; border:1px solid var(--border); cursor:pointer; color:var(--text); background:transparent; }
+    .theme-toggle i { color:var(--primary); }
+
+    /* Inline SVG logo styling */
+    .brand-logo { height:36px; width:auto; display:block; }
+    .hero-logo { position:absolute; top:16px; left:18px; z-index:2; }
+    .hero-logo .logo { height:40px; width:auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,.25)); }
+
+    /* Fullscreen parallax sections */
+    .parallax {
+      position: relative; height: 100vh; min-height: 400px; width: 100%;
+      background-size: cover; background-position: center center; background-attachment: fixed;
+      display: grid; place-items: center; overflow: hidden; z-index:0;
+    }
+    .parallax::after { content:""; position:absolute; inset:0; background: linear-gradient(0deg, rgba(0,0,0,.35), rgba(0,0,0,.35)); }
+    .p-content { position: relative; z-index: 1; color:#fff; text-align:center; padding: 0 18px; max-width: 1000px; }
+    .p-content h1 { margin:0 0 10px; font-size: clamp(2rem, 4vw, 3rem); font-weight: 800; letter-spacing:-0.02em; }
+    .p-content p { margin:0 0 16px; color:#e9eef9; font-size: clamp(0.95rem, 1.8vw, 1.1rem); }
+    .p-cta { display:inline-flex; gap:10px; align-items:center; padding:12px 18px; border-radius:12px; font-weight:700; cursor:pointer; border:none; }
+    .p-cta.primary { background: linear-gradient(90deg, var(--primary), var(--secondary)); color:#fff; }
+    .p-cta.secondary { background: rgba(255,255,255,.15); color:#fff; border:1px solid rgba(255,255,255,.35); }
+    @media (max-width: 900px) { .parallax { background-attachment: scroll; } }
+
+    .wrapper { width:100%; max-width:1100px; margin:0 auto; padding: 18px; position:relative; z-index:2; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:24px; margin-bottom:20px; box-shadow:var(--shadow); position:relative; z-index:2; }
+    .card:hover { transform: translateY(-3px); transition: .25s; }
+    h2 { margin: 0 0 10px; font-weight:800; letter-spacing:-0.02em; }
+    h1.app-title { margin:0 0 6px; font-size:2rem; background:linear-gradient(45deg, var(--primary), var(--secondary)); -webkit-background-clip:text; color:transparent; font-weight:800; letter-spacing:-0.02em; }
+    .subtitle{ color:var(--muted); margin:0 0 10px; }
+    .grid { display:grid; gap:16px; grid-template-columns: 1fr 1fr; }
+    .row { display:flex; gap:12px; flex-wrap: wrap; }
+    .row > div { flex:1 1 200px; min-width: 200px; }
+    label { font-weight:700; margin-bottom:6px; display:block; color:var(--text); }
+    input, select, textarea { width:100%; padding:12px; border-radius:12px; border:1px solid var(--input); background:#fafafa; color:var(--text); }
+    [data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea { background:#0f172a; border-color:#263142; }
+    input:focus, select:focus, textarea:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(67,97,238,.15); }
+    .cta { background:linear-gradient(90deg,var(--primary),var(--secondary)); color:#fff; border:none; border-radius:12px; padding:12px 18px; cursor:pointer; font-weight:700; }
+    .cta:hover{ opacity:.95 }
+
+    #mapCard { padding:0; }
+    #leafletMap { height:420px; width:100%; border-radius:16px; }
+    #resultsCard { display:none; }
+    #errorCard { display:none; border-color:var(--error); background:#ffebee; }
+    [data-theme="dark"] #errorCard { background:#2d1b1b; }
+    #errorText { color:var(--error); font-weight:600; }
+    #priceResult { font-size:1.8rem; font-weight:800; color:var(--primary); margin:6px 0 4px; font-variant-numeric: tabular-nums; }
+    .muted { color:var(--muted); }
+    #priceGraph { height:340px; }
+    .section-title { margin:16px 0 8px; font-size:1.1rem; font-weight:800; color:var(--text); }
+    .inline { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
+    .pill { display:inline-block; padding:6px 10px; border-radius:20px; background:var(--pill); border:1px solid var(--border); font-size:.9rem; font-variant-numeric: tabular-nums; }
+    @media (max-width: 880px) { .grid { grid-template-columns:1fr; } }
+
+    /* Bank offers table */
+    .offers-grid { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+    .offers-grid > div { flex:1 1 220px; min-width:220px; }
+    .table { width:100%; border-collapse: collapse; margin-top:10px; }
+    .table th, .table td { padding:10px 12px; border-bottom:1px solid var(--border); text-align:left; color:var(--text); font-variant-numeric: tabular-nums; }
+    .table th { background:#f8fafc; font-weight:800; }
+    [data-theme="dark"] .table th { background:#111827; }
+    .rate-pill { display:inline-block; padding:4px 8px; border-radius:14px; background:#eef2ff; color:#4338ca; font-weight:700; font-size:.9rem; }
+    [data-theme="dark"] .rate-pill { background:#1f2937; color:#a5b4fc; }
+    .apply-btn { display:inline-block; padding:8px 12px; background:linear-gradient(90deg,#4361ee,#3f37c9); color:#fff; border-radius:10px; text-decoration:none; font-weight:800; }
+
+    /* KPIs Dashboard */
+    .kpis { display:grid; gap:12px; grid-template-columns: repeat(3, 1fr); }
+    .kpi { background:var(--pill); border:1px solid var(--border); border-radius:12px; padding:14px; }
+    .kpi .k { font-size:.9rem; color:var(--muted); }
+    .kpi .v { font-weight:800; font-size:1.1rem; color:var(--text); margin-top:6px; font-variant-numeric: tabular-nums; }
+    @media (max-width:880px){ .kpis{ grid-template-columns:1fr 1fr; } }
+    @media (max-width:520px){ .kpis{ grid-template-columns:1fr; } }
+
+    /* Duty Calculator */
+    .duty-grid { display:grid; gap:12px; grid-template-columns: 1fr 1fr; }
+    .duty-summary { background:var(--pill); border:1px solid var(--border); border-radius:12px; padding:14px; }
+
+    /* Contact */
+    .contact-grid { display:grid; gap:16px; grid-template-columns:1fr 1fr; }
+    .contact-card { background:#f8fafc; border:1px solid var(--border); border-radius:12px; padding:14px; }
+    [data-theme="dark"] .contact-card { background:#0f172a; }
+    .contact-item { display:flex; gap:10px; align-items:flex-start; padding:8px 0; }
+    .contact-item i { color:var(--primary); font-size:1.1rem; margin-top:2px; }
+    .contact-item a { color:var(--primary); text-decoration:none; font-weight:800; }
+    .contact-item a:hover { text-decoration:underline; }
+    #contactStatus { margin-top:10px; padding:10px 12px; border-radius:10px; display:none; }
+    #contactStatus.success { display:block; background:#ecfdf5; border:1px solid #10b981; color:#065f46; }
+    #contactStatus.error { display:block; background:#fef2f2; border:1px solid #ef4444; color:#991b1b; }
+    @media (max-width: 880px) { .contact-grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <!-- Brand Header -->
+  <header class="brand-bar" aria-label="Brand header">
+    <div class="brand-wrap">
+      <a class="brand" href="#inputCard" aria-label="Go to Predictor">
+        <!-- Inline Propridict logo (SVG) -->
+        <svg class="brand-logo" viewBox="0 0 180 40" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Propridict logo">
+          <defs>
+            <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%" stop-color="#4361ee"/>
+              <stop offset="100%" stop-color="#3f37c9"/>
+            </linearGradient>
+          </defs>
+          <!-- Mark -->
+          <g>
+            <rect x="0" y="2" width="36" height="36" rx="8" fill="url(#g)"/>
+            <text x="18" y="27" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#fff" font-weight="800">P</text>
+          </g>
+          <!-- Wordmark -->
+          <text x="46" y="27" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text','Helvetica Neue','Segoe UI',Roboto,Arial,sans-serif" font-size="20" fill="currentColor" font-weight="800" letter-spacing="-0.02em">Propridict</text>
+        </svg>
+        <span class="brand-name" style="display:none;">Propridict</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="#inputCard"><i class="fas fa-calculator"></i> Predict</a>
+        <a href="#leafletMap"><i class="fas fa-map"></i> Map</a>
+        <a href="#offersCard"><i class="fas fa-university"></i> Offers</a>
+        <a href="#dashboardCard"><i class="fas fa-chart-pie"></i> Dashboard</a>
+        <a href="#contactCard"><i class="fas fa-handshake"></i> Contact</a>
+        <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle dark mode">
+          <i class="fas fa-moon"></i> <span id="themeLabel">Dark</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Parallax 1 (Top Hero) -->
+  <section class="parallax" style="background-image:url('https://images.unsplash.com/photo-1469474968028-56623f02e42e?q=80&w=2000&auto=format&fit=crop');">
+    <!-- Optional logo in hero -->
+    <div class="hero-logo">
+      <svg class="logo" viewBox="0 0 180 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs><linearGradient id="gh" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stop-color="#4361ee"/><stop offset="100%" stop-color="#3f37c9"/></linearGradient></defs>
+        <rect x="0" y="2" width="36" height="36" rx="8" fill="url(#gh)"/><text x="18" y="27" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#fff" font-weight="800">P</text>
+        <text x="46" y="27" font-family="-apple-system, BlinkMacSystemFont,'SF Pro Text','Helvetica Neue','Segoe UI',Roboto,Arial,sans-serif" font-size="20" fill="#fff" font-weight="800" letter-spacing="-0.02em">Propridict</text>
+      </svg>
+    </div>
+    <div class="p-content">
+      <h1>Premium Land Price Predictor</h1>
+      <p>Map integration • Premium factors • EMI • Trend chart • Bank offers • Duty calculator</p>
+      <div style="display:flex; gap:12px; justify-content:center; flex-wrap: wrap;">
+        <a href="#inputCard"><button class="p-cta primary"><i class="fas fa-play"></i> Start Prediction</button></a>
+        <a href="#leafletMap"><button class="p-cta secondary"><i class="fas fa-map"></i> View Map</button></a>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrapper" id="app">
+    <!-- Input -->
+    <section id="inputCard" class="card">
+      <h1 class="app-title"><i class="fas fa-map-marker-alt"></i> Land Price Predictor - Bhopal</h1>
+      <p class="subtitle">Enter property details to get a price projection</p>
+
+      <form id="predictionForm" autocomplete="off">
+        <div class="grid">
+          <div>
+            <label for="city"><i class="fas fa-city"></i> City</label>
+            <select id="city" required>
+              <option value="">Select a city</option>
+            </select>
+          </div>
+          <div>
+            <label for="landmark"><i class="fas fa-building"></i> Landmark/Area</label>
+            <select id="landmark" required disabled>
+              <option value="">Select city first</option>
+            </select>
+          </div>
+          <div>
+            <label for="category"><i class="fas fa-tags"></i> Property Category</label>
+            <select id="category" required disabled>
+              <option value="">Select landmark first</option>
+            </select>
+          </div>
+          <div>
+            <label for="size"><i class="fas fa-area-chart"></i> Size (sq. ft)</label>
+            <input id="size" type="number" min="100" max="1000000" value="1500" required />
+          </div>
+          <div>
+            <label for="year"><i class="fas fa-calendar"></i> Prediction Year</label>
+            <input id="year" type="number" min="2025" max="2050" value="2028" required />
+          </div>
+        </div>
+
+        <div class="section-title"><i class="fas fa-star"></i> Premium Factors</div>
+        <div class="row">
+          <div>
+            <label for="roadWidth">Road Width (ft)</label>
+            <input id="roadWidth" type="number" min="0" max="200" value="30" />
+          </div>
+          <div>
+            <label for="frontage">Frontage (ft)</label>
+            <input id="frontage" type="number" min="0" max="300" value="35" />
+          </div>
+          <div>
+            <label for="cornerPlot">Corner Plot</label>
+            <select id="cornerPlot">
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-top:14px;">
+          <button class="cta" type="submit"><i class="fas fa-calculator"></i> Predict Price</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <!-- Parallax 2 -->
+  <section class="parallax" style="background-image:url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=2000&auto=format&fit=crop');">
+    <div class="p-content">
+      <h1>Explore Market Hotspots</h1>
+      <p>See location impact via the interactive map and premium factors.</p>
+      <a href="#leafletMap"><button class="p-cta primary"><i class="fas fa-location-dot"></i> Go to Map</button></a>
+    </div>
+  </section>
+
+  <div class="wrapper">
+    <!-- Map -->
+    <section id="mapCard" class="card">
+      <div id="leafletMap" aria-label="Map"></div>
+    </section>
+
+    <!-- Results -->
+    <section id="resultsCard" class="card">
+      <h2><i class="fas fa-chart-line"></i> Prediction Results</h2>
+      <div id="priceResult"></div>
+      <div id="rateResult" class="muted"></div>
+      <div class="pill" id="premiumBadge">Premium factor: x1.00</div>
+      <div class="section-title">Rate Trend</div>
+      <div id="priceGraph"></div>
+
+      <div class="section-title"><i class="fas fa-receipt"></i> Price Breakdown</div>
+      <div id="breakdown" class="muted"></div>
+
+      <div class="section-title"><i class="fas fa-landmark"></i> Loan / EMI Calculator</div>
+      <div class="inline">
+        <div>
+          <label for="interest">Interest Rate (% p.a.)</label>
+          <input id="interest" type="number" step="0.1" min="0" max="30" value="8.5"/>
+        </div>
+        <div>
+          <label for="tenure">Tenure (years)</label>
+          <input id="tenure" type="number" min="1" max="40" value="20"/>
+        </div>
+        <div>
+          <label for="downPct">Down Payment (% of price)</label>
+          <input id="downPct" type="number" step="0.5" min="0" max="100" value="20"/>
+        </div>
+      </div>
+      <div id="emiSummary" class="muted" style="margin-top:8px;"></div>
+    </section>
+  </div>
+
+  <!-- Duty Calculator -->
+  <div class="wrapper">
+    <section id="dutyCard" class="card">
+      <h2><i class="fas fa-file-invoice"></i> Stamp Duty & Registration (Indicative)</h2>
+      <p class="muted" style="margin-top:-4px;">Calculated on property value. Rates vary by state, owner type, and policy changes. Please verify locally.</p>
+      <div class="duty-grid">
+        <div>
+          <div class="row">
+            <div>
+              <label for="dutyState">State</label>
+              <select id="dutyState"></select>
+            </div>
+            <div>
+              <label for="dutyOwner">Owner Type</label>
+              <select id="dutyOwner">
+                <option>Male</option>
+                <option>Female</option>
+                <option>Joint</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label for="dutyUsePred">Use Predicted Price</label>
+              <select id="dutyUsePred">
+                <option value="yes" selected>Yes</option>
+                <option value="no">No (Enter custom value)</option>
+              </select>
+            </div>
+            <div>
+              <label for="dutyValue">Custom Property Value (₹)</label>
+              <input id="dutyValue" type="number" min="0" step="1" placeholder="e.g., 7500000" disabled>
+            </div>
+          </div>
+          <button id="dutyCalcBtn" class="cta" type="button"><i class="fas fa-calculator"></i> Calculate Duty</button>
+        </div>
+        <div class="duty-summary" id="dutySummary">
+          <div class="muted">Select state and owner type, then calculate.</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="wrapper">
+    <section id="dashboardCard" class="card">
+      <h2><i class="fas fa-chart-pie"></i> Summary Dashboard</h2>
+      <div class="kpis">
+        <div class="kpi"><div class="k">Predicted Price</div><div class="v" id="kpiPrice">—</div></div>
+        <div class="kpi"><div class="k">Adjusted Rate (/sq ft)</div><div class="v" id="kpiRate">—</div></div>
+        <div class="kpi"><div class="k">Stamp + Reg Fees</div><div class="v" id="kpiDuty">—</div></div>
+        <div class="kpi"><div class="k">Loan Principal</div><div class="v" id="kpiPrincipal">—</div></div>
+        <div class="kpi"><div class="k">Monthly EMI</div><div class="v" id="kpiEMI">—</div></div>
+        <div class="kpi"><div class="k">Cheapest Bank EMI</div><div class="v" id="kpiBestOffer">—</div></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Parallax between Results and Offers -->
+  <section class="parallax" style="background-image:url('https://pixabay.com/get/g84401295afef8a6fd10a7b41eff05432bb071d8f4a5f2e1e4478a43dd5f1088c319d4a527b45841aa7cb99cbd5d2e57e_1920.jpg?longlived=');">
+    <div class="p-content">
+      <h1>Compare Bank Offers</h1>
+      <p>Find the best interest rate, EMI, and fees for your budget.</p>
+      <a href="#offersCard"><button class="p-cta primary"><i class="fas fa-university"></i> View Offers</button></a>
+    </div>
+  </section>
+
+  <div class="wrapper">
+    <!-- Bank Offers (always visible) -->
+    <section id="offersCard" class="card">
+      <h2><i class="fas fa-university"></i> Bank Offers For You</h2>
+      <div class="offers-grid">
+        <div>
+          <label for="offerType">Loan Type</label>
+          <select id="offerType">
+            <option value="Home Loan" selected>Home Loan</option>
+            <option value="LAP">Loan Against Property</option>
+          </select>
+        </div>
+        <div>
+          <label for="offerCustomer">Customer Type</label>
+          <select id="offerCustomer">
+            <option value="All" selected>All</option>
+            <option value="Salaried">Salaried</option>
+            <option value="Self Employed">Self Employed</option>
+          </select>
+        </div>
+        <div>
+          <label for="offerSort">Sort By</label>
+          <select id="offerSort">
+            <option value="emi">EMI (Low → High)</option>
+            <option value="rate">Rate (Low → High)</option>
+            <option value="fee">Processing Fee (Low → High)</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="offersNote" class="dim" style="margin-top:8px;">Predict price to see personalized bank offers.</div>
+
+      <table class="table" aria-label="Bank offers">
+        <thead>
+          <tr>
+            <th>Bank</th>
+            <th>Product</th>
+            <th>Rate (% p.a.)</th>
+            <th>EMI</th>
+            <th>Tenure</th>
+            <th>Processing Fee</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="offersBody"></tbody>
+      </table>
+    </section>
+
+    <!-- Error -->
+    <section id="errorCard" class="card">
+      <h2><i class="fas fa-exclamation-triangle"></i> Error</h2>
+      <p id="errorText"></p>
+    </section>
+  </div>
+
+  <!-- Contact -->
+  <div class="wrapper">
+    <section id="contactCard" class="card">
+      <h2><i class="fas fa-handshake"></i> Consultation & Contact</h2>
+      <p class="muted" style="margin-top:-4px;">Book a free consultation. We’ll reach out within 24 hours.</p>
+
+      <div class="contact-grid">
+        <div class="contact-card" aria-label="Contact details">
+          <div class="contact-item"><i class="fas fa-phone"></i><div><div>Phone</div><a href="tel:+911234567890">+91 12345 67890</a></div></div>
+          <div class="contact-item"><i class="fab fa-whatsapp"></i><div><div>WhatsApp</div><a href="https://wa.me/911234567890?text=Hi%20I%27d%20like%20a%20property%20consultation" target="_blank" rel="noopener">Chat on WhatsApp</a></div></div>
+          <div class="contact-item"><i class="fas fa-envelope"></i><div><div>Email</div><a href="mailto:hello@propridict.com">hello@propridict.com</a></div></div>
+          <div class="contact-item"><i class="fas fa-location-dot"></i><div><div>Office</div><a href="https://maps.google.com/?q=Your%20Office%20Address" target="_blank" rel="noopener">Your Office Address, City</a><div class="muted">Mon–Sat: 10am–7pm</div></div></div>
+        </div>
+
+        <div>
+          <form id="contactForm" class="contact-card" autocomplete="off" aria-label="Consultation form">
+            <div class="row">
+              <div><label for="contactName">Full Name</label><input id="contactName" type="text" required placeholder="Your name"/></div>
+              <div><label for="contactEmail">Email</label><input id="contactEmail" type="email" required placeholder="name@email.com"/></div>
+            </div>
+            <div class="row">
+              <div><label for="contactPhone">Phone</label><input id="contactPhone" type="tel" required placeholder="+91 XXXXX XXXXX"/></div>
+              <div><label for="contactPurpose">Purpose</label><select id="contactPurpose" required>
+                <option value="Property Buying" selected>Property Buying</option>
+                <option value="Loan/EMI">Loan/EMI</option>
+                <option value="Sell/Lease">Sell/Lease</option>
+                <option value="Site Visit">Site Visit</option>
+                <option value="General">General</option>
+              </select></div>
+            </div>
+            <div class="row">
+              <div><label for="contactDate">Preferred Date</label><input id="contactDate" type="date"/></div>
+              <div><label for="contactTime">Preferred Time</label><input id="contactTime" type="time"/></div>
+            </div>
+            <div><label for="contactMessage">Message</label>
+              <textarea id="contactMessage" rows="4" placeholder="Tell us about your requirement (location, budget, timeline)…"></textarea>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px; margin-top:8px;">
+              <input id="contactConsent" type="checkbox" required/>
+              <label for="contactConsent" class="muted" style="margin:0;">I agree to be contacted on phone/email/WhatsApp.</label>
+            </div>
+            <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="cta" type="submit"><i class="fas fa-paper-plane"></i> Send Request</button>
+              <a class="cta" style="background:#10b981;" href="mailto:hello@propridict.com?subject=Consultation%20Request&body=Hi%2C%20I%27d%20like%20a%20consultation."
+                 aria-label="Email us directly"><i class="fas fa-envelope-open-text"></i> Email Us</a>
+            </div>
+            <div id="contactStatus" role="status" aria-live="polite"></div>
+          </form>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Parallax 3 -->
+  <section class="parallax" style="background-image:url('https://images.unsplash.com/photo-1501183638710-841dd1904471?q=80&w=2000&auto=format&fit=crop');">
+    <div class="p-content">
+      <h1>Plan Smarter, Invest Better</h1>
+      <p>Use EMI, duties, and bank offers to make the best decision.</p>
+      <a href="#inputCard"><button class="p-cta secondary"><i class="fas fa-rotate-left"></i> Start Over</button></a>
+    </div>
+  </section>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+  <script>
+    const USD_RATE = 0.012;
+
+    // Data with coordinates (Bhopal + Indore)
+    const DATA_SET = [
+      { City:"Bhopal", Landmark:"Arera Colony", Category:"Residential", Rate2018:3200, Rate2024:4700, lat:23.235, lng:77.445 },
+      { City:"Bhopal", Landmark:"Arera Colony", Category:"Commercial",  Rate2018:6300, Rate2024:9300, lat:23.235, lng:77.445 },
+      { City:"Bhopal", Landmark:"MP Nagar", Category:"Residential", Rate2018:4000, Rate2024:5500, lat:23.257, lng:77.420 },
+      { City:"Bhopal", Landmark:"MP Nagar", Category:"Commercial",  Rate2018:9300, Rate2024:13300, lat:23.257, lng:77.420 },
+      { City:"Bhopal", Landmark:"Kolar Road", Category:"Residential", Rate2018:1500, Rate2024:2500, lat:23.205, lng:77.472 },
+      { City:"Bhopal", Landmark:"Kolar Road", Category:"Commercial",  Rate2018:3500, Rate2024:6500, lat:23.205, lng:77.472 },
+      { City:"Bhopal", Landmark:"Hoshangabad Road", Category:"Residential", Rate2018:1700, Rate2024:3000, lat:23.185, lng:77.400 },
+      { City:"Bhopal", Landmark:"Hoshangabad Road", Category:"Commercial",  Rate2018:3700, Rate2024:6000, lat:23.185, lng:77.400 },
+      { City:"Bhopal", Landmark:"Shahpura Lake", Category:"Residential", Rate2018:2800, Rate2024:4200, lat:23.220, lng:77.440 },
+      { City:"Bhopal", Landmark:"Shahpura Lake", Category:"Commercial",  Rate2018:5200, Rate2024:7800, lat:23.220, lng:77.440 },
+      { City:"Bhopal", Landmark:"TT Nagar", Category:"Residential", Rate2018:3500, Rate2024:5200, lat:23.245, lng:77.410 },
+      { City:"Bhopal", Landmark:"TT Nagar", Category:"Commercial",  Rate2018:8000, Rate2024:12000, lat:23.245, lng:77.410 },
+      { City:"Bhopal", Landmark:"BHEL Township", Category:"Residential", Rate2018:1900, Rate2024:2700, lat:23.280, lng:77.415 },
+      { City:"Bhopal", Landmark:"BHEL Township", Category:"Commercial",  Rate2018:4700, Rate2024:6500, lat:23.280, lng:77.415 },
+      { City:"Bhopal", Landmark:"Old City", Category:"Residential", Rate2018:1800, Rate2024:2800, lat:23.270, lng:77.405 },
+      { City:"Bhopal", Landmark:"Old City", Category:"Commercial",  Rate2018:4500, Rate2024:6800, lat:23.270, lng:77.405 },
+      { City:"Bhopal", Landmark:"Ashoka Garden", Category:"Residential", Rate2018:1600, Rate2024:2600, lat:23.275, lng:77.440 },
+      { City:"Bhopal", Landmark:"Ashoka Garden", Category:"Commercial",  Rate2018:3800, Rate2024:5800, lat:23.275, lng:77.440 },
+      { City:"Bhopal", Landmark:"Near Oriental College", Category:"Residential", Rate2018:1400, Rate2024:2400, lat:23.200, lng:77.480 },
+      { City:"Bhopal", Landmark:"Near Oriental College", Category:"Commercial",  Rate2018:3300, Rate2024:5500, lat:23.200, lng:77.480 },
+      { City:"Bhopal", Landmark:"Near Railway Station", Category:"Residential", Rate2018:3300, Rate2024:4800, lat:23.260, lng:77.410 },
+      { City:"Bhopal", Landmark:"Near Railway Station", Category:"Commercial",  Rate2018:8500, Rate2024:12500, lat:23.260, lng:77.410 },
+      { City:"Bhopal", Landmark:"Neelbad", Category:"Residential", Rate2018:1300, Rate2024:2300, lat:23.160, lng:77.450 },
+      { City:"Bhopal", Landmark:"Neelbad", Category:"Commercial",  Rate2018:3000, Rate2024:5000, lat:23.160, lng:77.450 },
+      { City:"Bhopal", Landmark:"Indrapuri", Category:"Residential", Rate2018:2000, Rate2024:3100, lat:23.270, lng:77.380 },
+      { City:"Bhopal", Landmark:"Indrapuri", Category:"Commercial",  Rate2018:4800, Rate2024:7000, lat:23.270, lng:77.380 },
+      { City:"Indore", Landmark:"Vijay Nagar", Category:"Residential", Rate2018:4500, Rate2024:6500, lat:22.753, lng:75.892 },
+      { City:"Indore", Landmark:"Vijay Nagar", Category:"Commercial",  Rate2018:11000, Rate2024:16000, lat:22.753, lng:75.892 },
+      { City:"Indore", Landmark:"Super Corridor", Category:"Residential", Rate2018:2000, Rate2024:4000, lat:22.780, lng:75.820 },
+      { City:"Indore", Landmark:"Super Corridor", Category:"Commercial",  Rate2018:4000, Rate2024:7500, lat:22.780, lng:75.820 }
+    ];
+
+    // Indicative bank offers
+    const BANK_OFFERS = [
+      { bank:"SBI",  product:"Home Loan",        customer:"All", type:"Home Loan", rateMin:8.4, rateMax:9.15, proc:{ pct:0.35, min:2000, max:10000 }, maxTenure:30, link:"https://sbi.co.in/web/personal-banking/loans/home-loans", lastUpdated:"2024-10" },
+      { bank:"HDFC Bank", product:"Home Loan",   customer:"All", type:"Home Loan", rateMin:8.5, rateMax:9.5,  proc:{ pct:0.5,  min:3000, max:10000 }, maxTenure:30, link:"https://www.hdfc.com/home-loan", lastUpdated:"2024-10" },
+      { bank:"ICICI Bank", product:"Home Loan",  customer:"All", type:"Home Loan", rateMin:8.6, rateMax:9.6,  proc:{ pct:0.5,  min:3500, max:10000 }, maxTenure:30, link:"https://www.icicibank.com/personal-banking/loans/home-loan", lastUpdated:"2024-10" },
+      { bank:"Axis Bank", product:"Home Loan",   customer:"All", type:"Home Loan", rateMin:8.5, rateMax:9.4,  proc:{ pct:0.5,  min:3000, max:10000 }, maxTenure:30, link:"https://www.axisbank.com/retail/loans/home-loan", lastUpdated:"2024-10" },
+      { bank:"PNB", product:"Home Loan",         customer:"All", type:"Home Loan", rateMin:8.5, rateMax:9.25, proc:{ pct:0.35, min:2000, max:10000 }, maxTenure:30, link:"https://www.pnbindia.in/home-loan.html", lastUpdated:"2024-10" },
+      { bank:"Bank of Baroda", product:"LAP",    customer:"Self Employed", type:"LAP", rateMin:10.0,rateMax:12.5, proc:{ pct:1.0,  min:7500, max:25000 }, maxTenure:15, link:"https://www.bankofbaroda.in/personal-banking/loans/loan-against-property", lastUpdated:"2024-10" },
+      { bank:"Kotak", product:"LAP",             customer:"All", type:"LAP", rateMin:10.5,rateMax:13.0, proc:{ pct:1.0,  min:10000,max:30000 }, maxTenure:15, link:"https://www.kotak.com/en/personal-banking/loans/loan-against-property.html", lastUpdated:"2024-10" },
+      { bank:"Union Bank", product:"Home Loan",  customer:"All", type:"Home Loan", rateMin:8.4, rateMax:9.35, proc:{ pct:0.5,  min:3000, max:10000 }, maxTenure:30, link:"https://www.unionbankofindia.co.in/english/home-loans.aspx", lastUpdated:"2024-10" }
+    ];
+
+    // Stamp duty rules (indicative)
+    const STAMP_RULES = {
+      "Madhya Pradesh": { stamp:{ base:7.5 }, reg:1.0 },
+      "Delhi":          { stamp:{ base:6.0, female:4.0, joint:5.0 }, reg:1.0 },
+      "Maharashtra":    { stamp:{ base:6.0 }, reg:1.0 },
+      "Uttar Pradesh":  { stamp:{ base:7.0, female:6.0 }, reg:1.0 },
+      "Karnataka":      { stamp:{ base:5.0 }, reg:1.0 },
+      "Telangana":      { stamp:{ base:5.0 }, reg:1.0 }
+    };
+
+    // DOM refs
+    const citySel = document.getElementById('city');
+    const landmarkSel = document.getElementById('landmark');
+    const categorySel = document.getElementById('category');
+    const sizeInput = document.getElementById('size');
+    const yearInput = document.getElementById('year');
+    const roadWidthInput = document.getElementById('roadWidth');
+    const frontageInput = document.getElementById('frontage');
+    const cornerPlotSel = document.getElementById('cornerPlot');
+    const predictionForm = document.getElementById('predictionForm');
+
+    const resultsCard = document.getElementById('resultsCard');
+    const errorCard = document.getElementById('errorCard');
+    const errorText = document.getElementById('errorText');
+
+    const priceEl = document.getElementById('priceResult');
+    const rateEl = document.getElementById('rateResult');
+    const premiumBadge = document.getElementById('premiumBadge');
+    const breakdownEl = document.getElementById('breakdown');
+    const priceGraph = document.getElementById('priceGraph');
+
+    const interestInput = document.getElementById('interest');
+    const tenureInput = document.getElementById('tenure');
+    const downPctInput = document.getElementById('downPct');
+    const emiSummary = document.getElementById('emiSummary');
+
+    const offersBody = document.getElementById('offersBody');
+    const offerTypeSel = document.getElementById('offerType');
+    const offerCustomerSel = document.getElementById('offerCustomer');
+    const offerSortSel = document.getElementById('offerSort');
+    const offersNote = document.getElementById('offersNote');
+
+    const dutyStateSel = document.getElementById('dutyState');
+    const dutyOwnerSel = document.getElementById('dutyOwner');
+    const dutyUsePredSel = document.getElementById('dutyUsePred');
+    const dutyValueInput = document.getElementById('dutyValue');
+    const dutyCalcBtn = document.getElementById('dutyCalcBtn');
+    const dutySummary = document.getElementById('dutySummary');
+
+    const kpiPrice = document.getElementById('kpiPrice');
+    const kpiRate = document.getElementById('kpiRate');
+    const kpiDuty = document.getElementById('kpiDuty');
+    const kpiPrincipal = document.getElementById('kpiPrincipal');
+    const kpiEMI = document.getElementById('kpiEMI');
+    const kpiBestOffer = document.getElementById('kpiBestOffer');
+
+    const contactForm = document.getElementById('contactForm');
+    const contactName = document.getElementById('contactName');
+    const contactEmail = document.getElementById('contactEmail');
+    const contactPhone = document.getElementById('contactPhone');
+    const contactPurpose = document.getElementById('contactPurpose');
+    const contactDate = document.getElementById('contactDate');
+    const contactTime = document.getElementById('contactTime');
+    const contactMessage = document.getElementById('contactMessage');
+    const contactConsent = document.getElementById('contactConsent');
+    const contactStatus = document.getElementById('contactStatus');
+
+    const themeToggle = document.getElementById('themeToggle');
+    const themeLabel = document.getElementById('themeLabel');
+
+    // State + Map
+    let map, marker;
+    let currentState = { years: [], baseRates: [], baseFutureRate: 0, size: 0, factor: 1.0, totalPriceINR: 0 };
+    let bestOffer = null;
+
+    // Helpers
+    const unique = (arr) => [...new Set(arr)];
+    const clamp = (n, min, max) => Math.min(Math.max(n, min), max);
+    const formatINR = (val) => `₹${Math.round(val).toLocaleString('en-IN')}`;
+    const isDark = () => document.documentElement.dataset.theme === 'dark';
+
+    function fillDropdown(sel, items, placeholder){
+      sel.innerHTML = `<option value="">${placeholder}</option>`;
+      items.forEach(v => sel.insertAdjacentHTML('beforeend', `<option value="${v}">${v}</option>`));
+    }
+    function getCities(){ return unique(DATA_SET.map(r=>r.City)).sort(); }
+    function getLandmarks(city){ return unique(DATA_SET.filter(r=>r.City===city).map(r=>r.Landmark)).sort(); }
+    function getCategories(city, lm){ return unique(DATA_SET.filter(r=>r.City===city && r.Landmark===lm).map(r=>r.Category)).sort(); }
+    function getRow(city,lm,cat){ return DATA_SET.find(r=>r.City===city && r.Landmark===lm && r.Category===cat); }
+    function getCoords(city, lm){ const r = DATA_SET.find(x=>x.City===city && x.Landmark===lm); return r ? [r.lat, r.lng] : null; }
+
+    function predictRate(year, r2018, r2024){
+      const years = 2024-2018;
+      if(r2018<=0 || years<=0) return { futureRate:r2024, cagr:0 };
+      const cagr = Math.pow(r2024/r2018, 1/years) - 1;
+      let rate = r2024;
+      for(let y=2025; y<=year; y++){
+        let g = cagr;
+        if(y>2040) g *= 0.95;
+        else if(y>2035) g *= 0.98;
+        rate *= (1+g);
+      }
+      return { futureRate: Math.max(rate,1000), cagr };
+    }
+    function buildSeries(year, row){
+      const xs = [];
+      for(let y=2018; y<=year; y++) xs.push(y);
+      const ys = xs.map(y=>{
+        if(y<=2024){
+          const t = (y-2018)/(2024-2018);
+          return row.Rate2018 + (row.Rate2024-row.Rate2018)*t;
+        }
+        return predictRate(y, row.Rate2018, row.Rate2024).futureRate;
+      });
+      return { xs, ys };
+    }
+    function computePremiumFactor(roadFt, isCorner, frontageFt){
+      let p = 0;
+      if(roadFt > 40) p += 0.06;
+      else if(roadFt >= 31) p += 0.04;
+      else if(roadFt >= 21) p += 0.02;
+
+      if(frontageFt >= 50) p += 0.06;
+      else if(frontageFt >= 40) p += 0.04;
+      else if(frontageFt >= 30) p += 0.02;
+      else if(frontageFt >= 20) p += 0.01;
+
+      if(isCorner) p += 0.05;
+
+      const factor = 1 + p;
+      return { factor, premiumPct: (p*100) };
+    }
+
+    function plotRates(years, baseRates, factor){
+      const adjusted = baseRates.map(r => r*factor);
+      const template = isDark() ? 'plotly_dark' : 'plotly_white';
+      Plotly.newPlot('priceGraph', [
+        { x: years, y: baseRates, type:'scatter', mode:'lines+markers',
+          name:'Base rate', line:{color:'#4361ee', width:3}, fill:'tozeroy',
+          fillcolor: isDark() ? 'rgba(122,162,255,0.12)' : 'rgba(67,97,238,0.12)' },
+        { x: years, y: adjusted, type:'scatter', mode:'lines+markers',
+          name:'Adjusted (with premiums)', line:{color:'#9b59b6', width:3} }
+      ], {
+        title:'Rate Trend (₹/sq ft)', xaxis:{ title:'Year' }, yaxis:{ title:'Rate (₹/sq ft)' },
+        template, hovermode:'x unified', margin:{t:40,l:50,r:20,b:40}, legend: { orientation:'h', y:-0.2 }
+      }, { responsive:true, displaylogo:false });
+    }
+
+    function updateEMIOutputs(totalPriceINR){
+      let rate = parseFloat(interestInput.value || '0');
+      let years = parseInt(tenureInput.value || '0', 10);
+      let downPct = parseFloat(downPctInput.value || '0');
+
+      rate = clamp(rate, 0, 100);
+      years = clamp(years, 0, 100);
+      downPct = clamp(downPct, 0, 100);
+
+      const downPayment = totalPriceINR * (downPct/100);
+      const principal = Math.max(totalPriceINR - downPayment, 0);
+
+      let emi = 0, totalPay = 0, totalInt = 0;
+      if(rate > 0 && years > 0 && principal > 0){
+        const r = rate/12/100;
+        const n = years*12;
+        const pow = Math.pow(1+r, n);
+        emi = principal * r * pow / (pow - 1);
+        totalPay = emi * n;
+        totalInt = totalPay - principal;
+      }
+
+      emiSummary.innerHTML = `
+        Loan principal: <b>${formatINR(principal)}</b> • Monthly EMI: <b>${formatINR(emi)}</b><br/>
+        Total interest: <b>${formatINR(totalInt)}</b> • Total payment: <b>${formatINR(totalPay)}</b>
+      `;
+
+      kpiPrincipal.textContent = formatINR(principal);
+      kpiEMI.textContent = formatINR(emi);
+      return { principal, emi };
+    }
+
+    function calcEMI(principal, rateAnnualPct, years){
+      if (!principal || principal <= 0 || !rateAnnualPct || !years) return 0;
+      const r = rateAnnualPct/12/100;
+      const n = Math.round(years*12);
+      const pow = Math.pow(1+r, n);
+      return principal * r * pow / (pow - 1);
+    }
+    function feeAmount(proc, principal){
+      const pctAmt = (proc.pct/100) * principal;
+      return Math.min(proc.max, Math.max(proc.min, pctAmt));
+    }
+
+    function renderBankOffers(){
+      if (!currentState || !currentState.totalPriceINR || currentState.totalPriceINR <= 0){
+        offersBody.innerHTML = "";
+        offersNote.textContent = "Predict price to see personalized bank offers.";
+        bestOffer = null;
+        kpiBestOffer.textContent = "—";
+        return;
+      }
+
+      const loanType = offerTypeSel.value;
+      const customer = offerCustomerSel.value;
+      let tenureYears = parseFloat(tenureInput.value || '20');
+      tenureYears = Math.max(1, tenureYears);
+
+      const downPct = parseFloat(downPctInput.value || '0');
+      const loanAmount = Math.max(0, currentState.totalPriceINR * (1 - downPct/100));
+
+      if (loanAmount <= 0){
+        offersBody.innerHTML = "";
+        offersNote.textContent = "No loan amount (100% down payment). Adjust down payment to see offers.";
+        bestOffer = null;
+        kpiBestOffer.textContent = "—";
+        return;
+      }
+
+      let rows = BANK_OFFERS
+        .filter(o => o.type === loanType && (o.customer === "All" || o.customer === customer || customer === "All"))
+        .map(o => {
+          const tenureUsed = Math.min(tenureYears, o.maxTenure);
+          const emiMin = calcEMI(loanAmount, o.rateMin, tenureUsed);
+          const fee = feeAmount(o.proc, loanAmount);
+          return { ...o, tenureUsed, emiMin, fee };
+        });
+
+      const sortBy = offerSortSel.value;
+      rows.sort((a,b)=>{
+        if (sortBy === 'rate') return a.rateMin - b.rateMin;
+        if (sortBy === 'fee')  return a.fee - b.fee;
+        return a.emiMin - b.emiMin;
+      });
+
+      offersBody.innerHTML = rows.map(o => `
+        <tr>
+          <td><b>${o.bank}</b></td>
+          <td>${o.product}</td>
+          <td><span class="rate-pill">${o.rateMin.toFixed(2)}% – ${o.rateMax.toFixed(2)}%</span><br><span class="dim">Updated: ${o.lastUpdated}</span></td>
+          <td><b>₹${Math.round(o.emiMin).toLocaleString('en-IN')}</b><br><span class="dim">Est. at min rate</span></td>
+          <td>${o.tenureUsed} yrs <span class="dim">(max ${o.maxTenure})</span></td>
+          <td>₹${Math.round(o.fee).toLocaleString('en-IN')} <span class="dim">@ ${o.proc.pct}%</span></td>
+          <td><a class="apply-btn" href="${o.link}" target="_blank" rel="noopener">Apply</a></td>
+        </tr>
+      `).join('');
+
+      offersNote.innerHTML = `
+        Loan amount considered: <b>₹${Math.round(loanAmount).toLocaleString('en-IN')}</b> 
+        • Tenure: <b>${tenureYears}</b> yrs (bank max applies) 
+        • Down payment: <b>${downPct}%</b>
+      `;
+
+      if (rows.length > 0){
+        const best = rows.reduce((a,b)=> a.emiMin < b.emiMin ? a : b);
+        bestOffer = { bank: best.bank, emi: Math.round(best.emiMin) };
+        kpiBestOffer.textContent = `${best.bank}: ${formatINR(bestOffer.emi)}`;
+      } else {
+        bestOffer = null;
+        kpiBestOffer.textContent = "—";
+      }
+    }
+
+    // Stamp duty
+    function dutyRateFor(state, owner){
+      const rule = STAMP_RULES[state];
+      if(!rule) return { stamp:0, reg:0 };
+      const stamp = (rule.stamp[owner.toLowerCase()] ?? rule.stamp.base) || rule.stamp.base || 0;
+      const reg = rule.reg || 0;
+      return { stamp, reg };
+    }
+    function computeDuty(state, owner, value){
+      const { stamp, reg } = dutyRateFor(state, owner);
+      const stampFee = value * (stamp/100);
+      const regFee = value * (reg/100);
+      return { stamp, reg, stampFee, regFee, total: stampFee + regFee };
+    }
+    function updateDutyUI(){
+      const state = dutyStateSel.value || "Madhya Pradesh";
+      const owner = dutyOwnerSel.value || "Male";
+      const usePred = dutyUsePredSel.value === "yes";
+      const value = usePred ? currentState.totalPriceINR : Number(dutyValueInput.value || 0);
+
+      if(!value || value <= 0){
+        dutySummary.innerHTML = `<div class="muted">Enter a valid property value or run a prediction.</div>`;
+        kpiDuty.textContent = "—";
+        return null;
+      }
+
+      const res = computeDuty(state, owner, value);
+      dutySummary.innerHTML = `
+        <div><b>${state}</b> • Owner: <b>${owner}</b></div>
+        <div style="margin-top:6px;">Stamp duty rate: <b>${res.stamp.toFixed(2)}%</b> • Registration: <b>${res.reg.toFixed(2)}%</b></div>
+        <div style="margin-top:6px;">Stamp Duty: <b>${formatINR(res.stampFee)}</b><br/>Registration: <b>${formatINR(res.regFee)}</b></div>
+        <div style="margin-top:8px;">Total Govt. Fees: <b>${formatINR(res.total)}</b></div>
+        <div class="muted" style="margin-top:8px;">All-in cost (Value + Fees): <b>${formatINR(value + res.total)}</b></div>
+      `;
+      kpiDuty.textContent = formatINR(res.total);
+      return res;
+    }
+
+    // Error helpers
+    function showError(msg){
+      errorText.textContent = msg || 'Something went wrong.';
+      errorCard.style.display = 'block';
+      resultsCard.style.display = 'none';
+      offersBody.innerHTML = "";
+      offersNote.textContent = "Predict price to see personalized bank offers.";
+    }
+    function clearError(){ errorCard.style.display = 'none'; }
+
+    // Map
+    function initMap(){
+      map = L.map('leafletMap').setView([23.2599,77.4126], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap contributors' }).addTo(map);
+      setTimeout(()=> map.invalidateSize(), 200);
+      window.addEventListener('resize', ()=> map.invalidateSize());
+    }
+    function updateMarker(city, lm){
+      if(marker){ map.removeLayer(marker); marker = null; }
+      if(city && lm){
+        const coords = getCoords(city, lm);
+        if(coords){
+          marker = L.marker(coords).addTo(map).bindPopup(`<b>${lm}, ${city}</b>`).openPopup();
+          map.setView(coords, 13);
+          return;
+        }
+      }
+      if(city){
+        const center = city==='Indore' ? [22.7196,75.8577] : [23.2599,77.4126];
+        map.setView(center, 11);
+      }
+    }
+
+    // Theme
+    function applyTheme(theme){
+      document.documentElement.dataset.theme = theme;
+      localStorage.setItem('theme', theme);
+      themeLabel.textContent = theme === 'dark' ? 'Light' : 'Dark';
+      if(currentState && currentState.years.length){
+        plotRates(currentState.years, currentState.baseRates, currentState.factor);
+      }
+    }
+
+    // Contact (mailto fallback)
+    if (contactDate) contactDate.min = new Date().toISOString().split('T')[0];
+    function prefillConsultationMessage() {
+      if (!contactMessage) return;
+      let details = [];
+      if (currentState.totalPriceINR) {
+        details.push(`Estimated Price: ${formatINR(currentState.totalPriceINR)}`);
+        details.push(`Adjusted rate: ${formatINR(currentState.baseFutureRate * currentState.factor)}/sq ft`);
+        details.push(`Size: ${currentState.size} sq ft`);
+      }
+      const city = citySel.value || '';
+      const lm = landmarkSel.value || '';
+      const cat = categorySel.value || '';
+      if (city || lm || cat) details.push(`Selection: ${[lm, city].filter(Boolean).join(', ')} (${cat})`);
+      contactMessage.value = (details.length ? details.join('\n') + '\n\n' : '') + (contactMessage.value || '');
+    }
+    function mailtoFallback(payload) {
+      const mail = "hello@propridict.com";
+      const subject = `Consultation Request - ${payload.purpose || 'Inquiry'}`;
+      const lines = [
+        `Name: ${payload.name}`, `Email: ${payload.email}`, `Phone: ${payload.phone}`,
+        `Purpose: ${payload.purpose}`, `Preferred: ${payload.date || ''} ${payload.time || ''}`.trim(), '', (payload.message || '')
+      ];
+      const body = encodeURIComponent(lines.join('\n'));
+      window.location.href = `mailto:${mail}?subject=${encodeURIComponent(subject)}&body=${body}`;
+    }
+    if (contactForm) {
+      contactForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        contactStatus.className = ''; contactStatus.style.display = 'none'; contactStatus.textContent = '';
+        if (!contactConsent.checked) {
+          contactStatus.className = 'error';
+          contactStatus.textContent = 'Please agree to be contacted.';
+          contactStatus.style.display = 'block';
+          return;
+        }
+        const payload = {
+          name: contactName.value.trim(),
+          email: contactEmail.value.trim(),
+          phone: contactPhone.value.trim(),
+          purpose: contactPurpose.value,
+          date: contactDate.value, time: contactTime.value,
+          message: contactMessage.value.trim()
+        };
+        mailtoFallback(payload);
+        contactStatus.className = 'success';
+        contactStatus.textContent = 'Opening your email app… If it did not open, please email us directly.';
+        contactStatus.style.display = 'block';
+      });
+    }
+
+    // UI init
+    function initUI(){
+      fillDropdown(citySel, getCities(), 'Select City');
+      fillDropdown(dutyStateSel, Object.keys(STAMP_RULES), 'Select State');
+      dutyStateSel.value = "Madhya Pradesh";
+      const saved = localStorage.getItem('theme') || 'light';
+      applyTheme(saved);
+      initMap();
+      clearError();
+      renderBankOffers(); // empty state
+    }
+
+    // Events
+    themeToggle.addEventListener('click', ()=>{
+      const next = isDark() ? 'light' : 'dark';
+      applyTheme(next);
+    });
+
+    citySel.addEventListener('change', ()=>{
+      const city = citySel.value;
+      fillDropdown(landmarkSel, [], 'Select Landmark');
+      fillDropdown(categorySel, [], 'Select Category');
+      landmarkSel.disabled = !city;
+      categorySel.disabled = true;
+      if(city){
+        fillDropdown(landmarkSel, getLandmarks(city), 'Select Landmark');
+        updateMarker(city, null);
+      }
+      resultsCard.style.display = 'none';
+      offersBody.innerHTML = "";
+      offersNote.textContent = "Predict price to see personalized bank offers.";
+      clearError();
+    });
+
+    landmarkSel.addEventListener('change', ()=>{
+      const city = citySel.value;
+      const lm = landmarkSel.value;
+      fillDropdown(categorySel, [], 'Select Category');
+      categorySel.disabled = !lm;
+      if(lm){
+        fillDropdown(categorySel, getCategories(city, lm), 'Select Category');
+        updateMarker(city, lm);
+      }
+      resultsCard.style.display = 'none';
+      offersBody.innerHTML = "";
+      offersNote.textContent = "Predict price to see personalized bank offers.";
+      clearError();
+    });
+
+    predictionForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      clearError();
+
+      const city = citySel.value;
+      const lm = landmarkSel.value;
+      const cat = categorySel.value;
+      const size = Number(sizeInput.value);
+      const year = Number(yearInput.value);
+
+      if(!city || !lm || !cat) return showError('Please select City, Landmark, and Category.');
+      if(!Number.isFinite(size) || size <= 0) return showError('Please enter a valid Size (sq ft) greater than 0.');
+      if(!Number.isFinite(year) || year < 2025 || year > 2050) return showError('Prediction Year must be between 2025 and 2050.');
+
+      const row = getRow(city, lm, cat);
+      if(!row) return showError('No data for this combination. Try another.');
+
+      const { xs, ys } = buildSeries(year, row);
+      const { futureRate } = predictRate(year, row.Rate2018, row.Rate2024);
+
+      const roadFt = clamp(Number(roadWidthInput.value || 0), 0, 999);
+      const frontageFt = clamp(Number(frontageInput.value || 0), 0, 999);
+      const isCorner = (cornerPlotSel.value === 'yes');
+      const { factor, premiumPct } = computePremiumFactor(roadFt, isCorner, frontageFt);
+
+      const adjustedRate = futureRate * factor;
+      const totalPriceINR = adjustedRate * size;
+      const totalPriceUSD = totalPriceINR * USD_RATE;
+
+      currentState = { years: xs, baseRates: ys, baseFutureRate: futureRate, size, factor, totalPriceINR };
+
+      priceEl.innerHTML = `${formatINR(totalPriceINR)} <span class="muted">(≈ $${Math.round(totalPriceUSD).toLocaleString('en-IN')})</span>`;
+      rateEl.textContent = `Base rate: ${formatINR(futureRate)}/sq ft • Adjusted rate: ${formatINR(adjustedRate)}/sq ft`;
+      premiumBadge.textContent = `Premium factor: x${factor.toFixed(2)} (+${premiumPct.toFixed(1)}%)`;
+
+      breakdownEl.innerHTML = `
+        • Size: <b>${size.toLocaleString('en-IN')}</b> sq ft<br/>
+        • Road width: <b>${roadFt} ft</b> • Frontage: <b>${frontageFt} ft</b> • Corner: <b>${isCorner ? 'Yes' : 'No'}</b><br/>
+        • City: <b>${city}</b> • Landmark: <b>${lm}</b> • Category: <b>${cat}</b>
+      `;
+
+      plotRates(xs, ys, factor);
+      resultsCard.style.display = 'block';
+      updateMarker(city, lm);
+
+      const emiRes = updateEMIOutputs(totalPriceINR);
+      renderBankOffers();
+      updateDutyUI();
+      kpiPrice.textContent = formatINR(totalPriceINR);
+      kpiRate.textContent = `${formatINR(adjustedRate)}/sq ft`;
+      prefillConsultationMessage();
+    });
+
+    // Premium recalc
+    function recalcPremiums(){
+      if(resultsCard.style.display !== 'block') return;
+      const roadFt = clamp(Number(roadWidthInput.value || 0), 0, 999);
+      const frontageFt = clamp(Number(frontageInput.value || 0), 0, 999);
+      const isCorner = (cornerPlotSel.value === 'yes');
+      const { factor } = computePremiumFactor(roadFt, isCorner, frontageFt);
+
+      currentState.factor = factor;
+      const adjustedRate = currentState.baseFutureRate * factor;
+      const totalPriceINR = adjustedRate * currentState.size;
+      currentState.totalPriceINR = totalPriceINR;
+
+      priceEl.innerHTML = `${formatINR(totalPriceINR)} <span class="muted">(≈ $${Math.round(totalPriceINR*USD_RATE).toLocaleString('en-IN')})</span>`;
+      rateEl.textContent = `Base rate: ${formatINR(currentState.baseFutureRate)}/sq ft • Adjusted rate: ${formatINR(adjustedRate)}/sq ft`;
+
+      plotRates(currentState.years, currentState.baseRates, factor);
+      updateEMIOutputs(totalPriceINR);
+      renderBankOffers();
+      updateDutyUI();
+      kpiPrice.textContent = formatINR(totalPriceINR);
+      kpiRate.textContent = `${formatINR(adjustedRate)}/sq ft`;
+    }
+    roadWidthInput.addEventListener('input', recalcPremiums);
+    frontageInput.addEventListener('input', recalcPremiums);
+    cornerPlotSel.addEventListener('change', recalcPremiums);
+
+    // EMI/Offers recalc
+    [interestInput, tenureInput, downPctInput].forEach(el=>{
+      el.addEventListener('input', ()=>{
+        if(resultsCard.style.display !== 'block') return;
+        updateEMIOutputs(currentState.totalPriceINR);
+        renderBankOffers();
+      });
+    });
+
+    // Offers filters
+    [offerTypeSel, offerCustomerSel, offerSortSel].forEach(el => el.addEventListener('change', renderBankOffers));
+
+    // Duty events
+    dutyUsePredSel.addEventListener('change', ()=>{
+      const usePred = dutyUsePredSel.value === 'yes';
+      dutyValueInput.disabled = usePred;
+    });
+    [dutyStateSel, dutyOwnerSel, dutyUsePredSel, dutyValueInput].forEach(el=>{
+      el.addEventListener('change', updateDutyUI);
+      el.addEventListener('input', updateDutyUI);
+    });
+    dutyCalcBtn.addEventListener('click', updateDutyUI);
+
+    // Init
+    document.addEventListener('DOMContentLoaded', initUI);
+  </script>
+</body>
+</html>
